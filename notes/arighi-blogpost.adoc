@@ -1,0 +1,15 @@
+= Sched-Ext (Arighi Blogpost)
+Implement your own kernel CPU scheduler in Ubuntu with sched-ext 
+
+Summary of the Blog (https://arighi.blogspot.com/2023/07/implement-your-own-cpu-scheduler-in.html[Link To Blog])
+
+== What is Sched-Ext
+sched-ext is a new extensible scheduler class introduced in the Linux kernel that provides a mechanism to implement *scheduling policies as BPF programs* ([.underline]#Berkeley Packet Filter#). This *"pluggable"* approch make possible to easily and quickly implement test scheduling policies ([.underline]#there is no need to reboot the system#).
+
+Such programs can also be *connected to user-space* counterparts to defer scheduling decisions to regular user-space processes.
+
+== State in linux
+sched-ext is *not yet upstream* in the Linux Kernel, it is only available as a patch set in the Linux kernel mailing list (because of [.underline]#concern and potential issue#). Is it still possible to use by having a patched kernel with sched-ext but it is still *experimental*.
+
+== Notes
+Skipped example.

@@ -1,0 +1,16 @@
+= Notes
+
+include::notes/changwoo.adoc[leveloffset=1]
+include::notes/arighi-blogpost.adoc[leveloffset=1]
+
+== To see
+https://github.com/sched-ext/scx[sched-ext/scx]
+
+https://lwn.net/Articles/922405/[extensible scheduler class (LWN)]
+
+https://lwn.net/Articles/109458/[Schedulers, pluggable and realtime (LWN)]
+
+https://arighi.blogspot.com/2024/02/writing-scheduler-for-linux-in-rust.html?m=1[user-space scheduler (Arighi Blog)]
+
+== AsciiDoc
+https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/[AsciiDoc Quick Reference]

@@ -1,0 +1,15 @@
+= From Kernel Schedulers to BPF
+
+== What is a process Scheduler
+A process scheduler is an essential part of any OS which does:
+
+. *Task selection (/ranking)*: choose the task to be run next
+. *Time Slice*: choose how long is the next task allowed to run
+. *Core selection*: choose which cpu core should be use
+
+Skipped conflicting, CFS EEVDF ...
+
+
+
+== Notes
+Skipped notes of middle part.

@@ -1,4 +1,4 @@
-= Video Interview
+= David Vernet (Tech Over Tea interview)
 Linux Kernel Scheduler Developer | David Vernet (Tech Over Tea)
 
 Summary of video (https://www.youtube.com/watch?v=Ta0imAIz31M[Link to Video])
@@ -6,9 +6,9 @@ Summary of video (https://www.youtube.com/watch?v=Ta0imAIz31M[Link to Video])
 == Scheduler's problem space
 Every machine has a finite number of cores and job of the sheduler is to decide *which process to run on which core*. The scheduler want to balance the workload, running as many process in [.underline]#parallel# as possible, but it also has to account for the fact that moving a process to another core away from [.underline]#warm/hot caches#, could increase pagefault and reduce overall performance. 
 
-It also require a *load balancing*, which devide the load amonst the cores. The load ...
+It also require a *load balancing*, which devide the load amonst the cores. The load is how much things are running on the system, calculated as weight (normally 100 for a thread) * time that can run for. The objective is to devide the load as equally as possible (while keeping in mind warm cache). Often is done periodically, so for some time load accumulate than it is balance,... After deviding the load over various core, each core has its own run queue and calculate its own thread vrnuntime.
 
-Other problems of the scheduler are *fairness* and *Interactivity*. A good metrics for the scheduler is IPS meaning Instruction Per Seconds.
+Other problems of the scheduler are *fairness* (per core) and *Interactivity*. A good metrics for the scheduler is IPS meaning Instruction Per Seconds.
 
 The linux kernel initally used *CFS* (Completely Fair Scheduler) from 2006/2007(?) until 6.6 and then it switched to *EEVDF* (Earliest Eligible Virtual Deadline First). 
 
@@ -21,13 +21,13 @@ The idea is to count *Virtual Runtime*, the time the process run for in total, a
 Still has the Virtual Runtime but in addition it has a *deadline* which is summed to the Virtual Runtime to obtain a higher level of interactivity.
 
 == Sched_ext
-sched_ext and is a new *pluggable scheduling framework*, which lets you implement your own host wide scheduling policies as what are called BPF programs.
+sched_ext and is a new *pluggable scheduling framework* (in the work for the last 2 years), which lets you implement your own host wide scheduling policies as what are called BPF programs.
 
 . *Host wide*: it migrate all thread to your own scheduler except the [.underline]#real-time(/deadline)# threads, which are higher priority and remain in the kernel.
 . *eBPF*: let you run a jit (Just In Time) in the kernel, it has a specific istruction set and encoding for the istruction. During runtime it will read this BPF byte code and emit x86,arm,... istructions to run the program in to the kernel.
     .. There is a backend for the llvm (Compiler backend for multiple programming languages) that can compile c code into BPF instructions.
     .. Initially the name come from Packet Filtering (BPF = Berkeley Packet Filter) but then it extended (eBPF) and now it is no longer an acronym for something.
-    .. BPF programs *cannot crash the kernel* because it is [.underline]#statically analysed# by the *verifier* and it it could be potentially unsafe (like reading a pointer that shouldn't be read, has a memory leak,...) then it won't load the program into the kernel.
+    .. BPF programs *cannot crash (theoretically) the kernel* because it is [.underline]#statically analysed# by the *verifier* and it it could be potentially unsafe (like reading a pointer that shouldn't be read, has a memory leak,...) then it won't load the program into the kernel.
     .. Can *interact with userspace* from your BPF program with data structure called *maps*, real time shared memory readable and writible from both userspace and kernel space.
 
 == What are problem Sched_ext solve
@@ -36,10 +36,22 @@ CFS and EEDVF are general purpose, fair and worked for many years, but:
 . it it *hard to test*, because of long compilation time and possibility of breakage. BPF program are faster to recompile entire kernel and can dynamically loaded.
 . cannot have a highest performace for *specific usecase* because it need to be general purpose.
 . api it is *difficult to understand* and require low level knowlenge. Meanwhile api in sched_ext are more intuitive and abstract some of the complexity.
+. is it fixed to *stay in the kernel*, in the kernel there is no floating point math (only fixed point), so complex component such as load balancing cannot be offloaded to userspace like is it possible with sched_ext.
 
 //-
 
 * the *overhead* of sched_ext exist, for example for the translation of the BPF istruction but it is *minor* (a couple tens of a percentage)
-    * That is because *BPF is not userspace* framework, instead the kernel call your program when still being in kernelspace so the most important part remain in the kernel with no handshake but you [.underline]#can build userspace component above that# (often load balancing is done in userspace for ease). 
+    ** That is because *BPF is not userspace* framework, instead the kernel call your program when still being in kernelspace so the most important part remain in the kernel with no handshake but you [.underline]#can build userspace component above that# (often load balancing is done in userspace for ease, and it has minor overhead because it is run only every 1-2s). 
+    ** An exception to it is the work of [.underline]#Andrea Righi#, a Linux Kernel Engineer at Canonical, which is writing a linux scheduler written in Rust that *runs in user-space*.
 
-Restart from 29:50.
+=== Kernel space vs user space
+User space is the default, each normal process is runned as such. Processes in user space have their own *virtual address space*. 
+
+Kernel space processes are the one that manage the system, for example mapping the virtual memory to physical, scheduling,... The kernel has its own *monolithic address* space every thread in the in the kernel is in the same little sandbox but that sandbox is like the management of the system, it's distributing resources and it's a privileged component.
+
+[.underline]#Passing between kernel space and user space# is a *delicate*, because it can be cause of vulnerability and *expensive* operation, because a lot of things are happening in hardware. The execution context is changed, your registers the the user space registers are being saved on the stack; you're changing where the instruction pointer to point to somewhere in the kernel; you have to copy memory from user space; you're changing privilege level so all this stuff um that's called *trapping into the kernel* that's the term for all of this, which happens every time you go back and forth between the two.
+
+== Notes
+. They are trying to standardize the BPF woth the help of the *IETF (Internet Engineering Task Force)* especially for hardware vendor which would like to offload BPF program to external device.
+
+Restart from 54:00.

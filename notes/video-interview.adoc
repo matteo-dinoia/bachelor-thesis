@@ -53,5 +53,4 @@ Kernel space processes are the one that manage the system, for example mapping t
 
 == Notes
 . They are trying to standardize the BPF woth the help of the *IETF (Internet Engineering Task Force)* especially for hardware vendor which would like to offload BPF program to external device.
-
-Restart from 54:00.
+. One vruntime queue for cpu can scale well but doing load balancing (which is expensive) need to iterate over all vruntime queue, so it exist a *shared fifo run queue*, can be used for faster load balancing.

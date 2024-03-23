@@ -8,29 +8,77 @@ The core idea behind BPF is that it allows programs [.underline]#to be loaded in
 The linux scheduler is not a single one, as there are the *CFS, realtime and deadline scheduler*, even though the majority of the program are managed by the CFS. Sched-ext allow to have dedicate scheduler for workload.
 
 == Scheduling with BPF
-The proposed patch adds a *new scheduling class* called SCHED_EXT that can be [.underline]#selected with ```sched_setscheduler()```# call like others (except SCHED_DEADLINE). 
+The proposed patch adds a *new scheduling class* called SCHED_EXT that can be [.underline]#selected with `sched_setscheduler()`# call like others (except SCHED_DEADLINE). 
 
-It is an *unprivilaged* class so any process can put themself in this class and it is placed *between SCHED_IDLE and SCHED_NORMAL*. This make it impossible to take over the system with a SCHED_EXT scheduler, preventing application from running as SCHED_NORMAL. Also, [.underline]#it suggest that when a SCHED_EXT scheduler is load most the process will be handled by this#, if no such scheduler is loaded process in the SCHED_EXT are run with as if they where is SCHED_NORMAL. A BPF scheduler can *move all running process into SCHED_EXT* (only the ones below realtime priority) with the call ```scx_bpf_switch_all()```.
+It is an *unprivilaged* class so any process can put themself in this class and it is placed *between SCHED_IDLE and SCHED_NORMAL*. This make it impossible to take over the system with a SCHED_EXT scheduler, preventing application from running as SCHED_NORMAL. Also, [.underline]#it suggest that when a SCHED_EXT scheduler is load most the process will be handled by this#, if no such scheduler is loaded process in the SCHED_EXT are run with as if they where is SCHED_NORMAL. A BPF scheduler can *move all running process into SCHED_EXT* (only the ones below realtime priority) with the call `scx_bpf_switch_all()`.
 
-=== Queues, callbacks and functions
-A BPF scheduler will manage a set of *dispatch queue* ([.underline]#normally one per CPU plus one global#), which runnable tasks waiting for a CPU. When a CPU is ready to run the scheduler removes a task from the relevant dispatch queue and gives it to the CPU.
+=== Dispatch queues
+A BPF scheduler will manage a set of *dispatch queue* (DSQ), which contains runnable tasks waiting for a CPU, they are a way to matchthe impedance between the scheduler core and the BPF scheduler. They can operetare as [.underline]#FIFO or priority queue#.  
 
-A BPF scheduler is mostly implemented as a *set of callback to be invoked via an operations structures*, every of which inform the BPF of an [.underline]#event of a decision to be made#. Some of the callback are:
+By default, there is *one global* FIFO (`SCX_DSQ_GLOBAL`), and *one local per CPU* (`SCX_DSQ_LOCAL`), but it can manage an arbitrary number of DSQs using `scx_bpf_create_dsq()` and `scx_bpf_destroy_dsq()`. These are used as such:
 
-. ```prep_enable(), enable()```: inform that a process is *entering SCHED_EXT* class, and can be used to set up associated data. The first call is allowed to block and is used for [.underline]#memory alocations#, while the second cannot block but is the one to actually [.underline]#enabling scheduling# for the new task.
-. ```select_cpu()```: *select a CPU for a task that is just waking up*, it should return the number of the CPU to place the task on (which can be changed again before running it). This decision [.underline]#may be used by the scheduler to wake the selected CPU# if it is currently idle. 
-. ```enqueue()```: *Enqueue a task into the scheduler* for running. [.underline]#Normally# it call ```scx_bpf_dispatch()``` to [.underline]#place a task into a chosen dispatch queue#, from which it will eventually be run.
+. CPU always *executes a task from its local DSQ* (the first one). A task is [.underline]#"dispatched" to a DSQ#. A non-local DSQ is "consumed" to transfer a task to the consuming CPU's local DSQ.
+
+. if during this search the local DSQ is empty, the CPU *tries to consume the global DSQ*. If that doesn't yield a runnable task either, [.underline]#`ops.dispatch()`` is invoked.#
+
+
+== Callbacks and functions
+A BPF scheduler is mostly implemented as a *set of callback to be invoked via an operations structures*, every of which inform the BPF of an [.underline]#event of a decision to be made#. A BPF scheduler is [.underline]#a set of BPF programs that implements# the *strct sched_ext_ops*. The only actual required field is `ops.name` which must be a valid BPF object name, all the rest have [.underline]#default implementations#. Some of the callback are:
+
+. `prep_enable(), enable()`: inform that a process is *entering SCHED_EXT* class, and can be used to set up associated data. The first call is allowed to block and is used for [.underline]#memory alocations#, while the second cannot block but is the one to actually [.underline]#enabling scheduling# for the new task.
+. `select_cpu()`: *select a CPU for a task that is just waking up*, it should return the number of the CPU to place the task on (which can be changed again before running it). This decision [.underline]#may be used by the scheduler to wake the selected CPU# if it is currently idle. 
+. `enqueue()`: *Enqueue a task into the scheduler* for running. [.underline]#Normally# it call `scx_bpf_dispatch()` to [.underline]#place a task into a chosen dispatch queue#, from which it will eventually be run.
     * this call should provide the *lenght of time slice* the task will have once it runs. 
         ** If the speciefied as SCX_SLICE_INF, it will go into *tickless mode*
     * enque is *not required* to put in any dispatch queue and it could stash it somewhere for sometime. But the [.underline]#kernel ensure that a process is not forgotten for more than 30 seconds# (by default, can be reduced and not increased).
-. ```dispatch()```: called on *empty CPU dispatch queue* to assign new task to keep cpu busy.
+. `dispatch()`: called on *empty CPU dispatch queue* to assign new task to keep cpu busy.
     * If it remain empty [.underline]#the scheduler (?) will try to grab some from the global queue#.
-. ```update_idle()```: inform the scheduler of a *CPU leaving or entering idle*.
-. ```runnable(), running(), stopping(), queiscent()```: inform the scheduler of a *status changes for a task* (call respectively when a task: become runnable, start running on CPU, is taken off a CPU, is no longer runnable).
-. ```cpu_acquire(), cpu_release()```: inform scheduler of *availability change of a CPU*. Example of cpu_release is when a realtime scheduling class claim a CPU to manage.
+. `update_idle()`: inform the scheduler of a *CPU leaving or entering idle*.
+. `runnable(), running(), stopping(), queiscent()`: inform the scheduler of a *status changes for a task* (call respectively when a task: become runnable, start running on CPU, is taken off a CPU, is no longer runnable).
+. `cpu_acquire(), cpu_release()`: inform scheduler of *availability change of a CPU*. Example of cpu_release is when a realtime scheduling class claim a CPU to manage.
 
 // 
 
 * Full list at https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h[github link sched/ext.h], plus other resourse at end of https://github.com/sched-ext/sched_ext/blob/sched_ext/Documentation/scheduler/sched-ext.rst[sched-ext rust documentation].
 
-There are also *function* that can be called by the scheduler can call to [.underline]#affect scheduling decision#. For example ```scx_bpf_kick_cpu``` can be called to preempt a task tha is running on a CPU (removing it) and them call back the scheduler to pick a new task to run there.
+=== Functions
+There are also *function* that can be called by the scheduler can call to [.underline]#affect scheduling decision#. For example `scx_bpf_kick_cpu` can be called to preempt a task tha is running on a CPU (removing it) and them call back the scheduler to pick a new task to run there.
+
+== Scheduling cycle
+Scheduling Cycle
+
+The following briefly shows how a *waking task is scheduled and executed*.
+
+. Firsty `ops.select_cpu()` is invoked for two reason 
+    .. The CPU selected by ops.select_cpu() is an *optimization hint and not binding*. The [.underline]#actual decision is made at the last step# of scheduling. However, if it match where it runs there is a small performance gain.
+    .. A side-effect is *waking the CPU from idle*. it up from idle. 
+        * While a BPF scheduler [.underline]#can wake up any cpu using call# `scx_bpf_kick_cpu()``, using ops.select_cpu() judiciously can be *simpler and more efficient*.
+    .. A task *can be immediately dispatched* to a DSQ by calling `scx_bpf_dispatch()`. 
+        * If it is dispatched to `SCX_DSQ_LOCAL`, it will be dispatched to the local DSQ of whichever *CPU is returned* from `ops.select_cpu()`. 
+        * Additionally, dispatching directly will cause the `ops.enqueue()` *callback to be skipped*.
+    .. Note that the scheduler core will *ignore an invalid CPU* selection, for example, if it's outside the allowed cpumask of the task.
+
+. Then `ops.enqueue()` is invoked which make *one of the following decisions*:
+    .. *Dispatch to the global or local or custom* DSQ by calling `scx_bpf_dispatch()` with [.underline]#SCX_DSQ_GLOBAL, SCX_DSQ_LOCAL or a DSQ ID# smaller then 2^63, respectively.
+    .. *Queue the task* on the BPF side.
+
+. When a CPU is ready, search firstly the local then the global DSQ. *If there still isn't a task to run*, `ops.dispatch()` which can use:
+    .. `scx_bpf_dispatch()` *dispatches a task to a DSQ*. Any target DSQ can be used - SCX_DSQ_LOCAL, SCX_DSQ_LOCAL_ON | cpu, SCX_DSQ_GLOBAL or a custom DSQ. 
+        * [.underline]#Currently can't be called with BPF locks held#, this is being worked on and will be supported. 
+        * *schedules dispatching* rather than performing them immediately. 
+        * There can be *up to ops.dispatch_max_batch pending* tasks.
+    .. `scx_bpf_consume()` tranfers a task from the specified non-local DSQ *to the dispatching DSQ*. 
+        * This function [.underline]#cannot be called with any BPF locks# held. 
+        * *flushes the pending dispatched tasks* before trying to consume the specified DSQ.
+    ..  If are used *only the built-in DSQs there is no need to implement* this callback as a task is never queued on the BPF scheduler and both the local and global DSQs are consumed automatically.
+
+. After ops.dispatch() returns, 
+    .. search for *tasks in the local then global DSQ*
+    .. If `ops.dispatch()` *has dispatched any tasks, retry #3*.
+    .. If the *previous task is a runnable SCX task*, keep executing it (see SCX_OPS_ENQ_LAST).
+    .. Go *idle*.
+
+
+=== Extra Notes
+. `scx_bpf_dispatch()`/`scx_bpf_dispatch_vtime()` queues the task on the *respectevly on FIFO/priority*, queue of the target DSQ. 
+. Internal DSQs such as *SCX_DSQ_LOCAL and SCX_DSQ_GLOBAL do not support priority-queue*.

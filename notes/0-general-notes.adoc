@@ -1,10 +1,10 @@
 = Notes
 :toc:
 
-include::notes/changwoo.adoc[leveloffset=1]
-include::notes/arighi-blogpost.adoc[leveloffset=1]
-include::notes/video-interview.adoc[leveloffset=1]
-include::notes/david-video-presentation.adoc[leveloffset=1]
+include::changwoo.adoc[leveloffset=1]
+include::arighi-blogpost.adoc[leveloffset=1]
+include::video-interview.adoc[leveloffset=1]
+include::david-video-presentation.adoc[leveloffset=1]
 
 == To see
 https://github.com/sched-ext/scx[sched-ext/scx]

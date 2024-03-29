@@ -35,19 +35,19 @@ It is actually not require to implement any of the methods because each of them 
 .Examples of methods to implements
 [%collapsible]  
 ==== 
-image::../img/code-api.png[]
+image::img/code-api.png[]
 ====
 
 .Examples of partial implementation
 [%collapsible]  
 ==== 
-image::../img/example-bpf-scheduler.png[]
+image::img/example-bpf-scheduler.png[]
 ====
 
 == Code path
 See video.
 
-image::../img/sched-ext-flowchart.png[]
+image::img/sched-ext-flowchart.png[]
 
 
 == Common objections (less important)

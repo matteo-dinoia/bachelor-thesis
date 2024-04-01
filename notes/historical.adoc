@@ -1,0 +1,5 @@
+= History
+
+. finding information about how it works in broad strokes
+. trying to set the scheduling class to a process with setattr/getattr
+. filing bug for sccache (https://github.com/sched-ext/scx/issues/205[Link to issuetracker])

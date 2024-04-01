@@ -1,0 +1,22 @@
+= Extra
+
+== Links
+. https://github.com/sched-ext/scx[sched-ext/scx]
+
+. https://lwn.net/Articles/922405/[extensible scheduler class (LWN)]
+
+. https://lwn.net/Articles/109458/[Schedulers, pluggable and realtime (LWN)]
+
+. https://arighi.blogspot.com/2024/02/writing-scheduler-for-linux-in-rust.html?m=1[user-space scheduler (Arighi Blog)]
+
+
+== To search
+. Scheduling class
+. Operations structures (https://lwn.net/Articles/811631/[Link])
+. Tickless mode -> no timeout i think (https://lwn.net/Articles/549580/[Link])
+. BPF maps
+. What does every scheduler example do
+. Is BPF rbtree still out of tree (starting point is https://lwn.net/ml/bpf/20230131180016.3368305-1-davemarchevsky@fb.com/[link])
+
+== To add
+. Selecting mode partial with -p in examples

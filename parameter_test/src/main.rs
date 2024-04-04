@@ -54,14 +54,14 @@ fn get_method(pid : i32){
             pid, get_priority(policy), policy);
 }
 
-fn list_on_shed_ext() -> String{
+fn get_list_in_sheduling_class(sched_class : &str) -> String{
     let ps_child = Command::new("ps")
         .args(&["-Ao", "pid,class,cmd"])
         .stdout(Stdio::piped())
         .spawn()  
         .unwrap();
     let grep_child = Command::new("grep")
-        .arg("[#]7")
+        .arg(sched_class)
         .stdin(Stdio::from(ps_child.stdout.unwrap())) // Pipe through.
         .stdout(Stdio::piped())
         .spawn()
@@ -91,7 +91,7 @@ fn main() {
                 set_method(pid, policy);
             },
             "x" => {
-                let list =  list_on_shed_ext();
+                let list =  get_list_in_sheduling_class("#7");
                 if list.lines().count() != 0 {
                     print!("Process on scheduling class ext (#7) are:\n {}", 
                         list);
@@ -103,7 +103,7 @@ fn main() {
             "y" => {
                 println!("Resetting processes to normal classes");
 
-                let list =  list_on_shed_ext();
+                let list =  get_list_in_sheduling_class("#7");
                 let array = list.lines().map(|line | {line.trim().split(" ").next()});
                 array.for_each(|pid_str| {
                     let pid_res = pid_str.unwrap().trim().parse::<i32>();

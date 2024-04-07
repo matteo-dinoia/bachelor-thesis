@@ -74,7 +74,7 @@ fn main() {
 	let mut command = String::new();
 	
 	loop{
-		print!("\nInsert what to do (read/write/exit [R/w/any]): ");
+		print!("\nInsert what to do (R/w/l/n/q or h for help]): ");
 		io::stdout().flush().unwrap();
 		
 		command.clear();
@@ -90,7 +90,7 @@ fn main() {
 				let policy = read_number("Insert policy to change to: ");
 				set_method(pid, policy);
 			},
-			"x" => {
+			"l" => {
 				let list =  get_list_in_sheduling_class("#7");
 				if list.lines().count() != 0 {
 					print!("Process on scheduling class ext (#7) are:\n {}", 
@@ -100,7 +100,7 @@ fn main() {
 				}
 				
 			},
-			"y" => {
+			"n" => {
 				println!("Resetting processes to normal classes");
 
 				let list =  get_list_in_sheduling_class("#7");
@@ -112,6 +112,18 @@ fn main() {
 					}
 				});
 			},
+			"h" => {
+				println!();
+				println!("---------------------- HELP ----------------------");
+				println!("Usage:");
+				println!("  r\tTo display a process scheduling class");
+				println!("  w\tTo change a process scheduling class");
+				println!("  l\tTo list processes in sched_ext class");
+				println!("  n\tTo move all process back to sched_normal");
+				println!("  q\tQuit");
+				println!("--------------------------------------------------");
+				println!();
+			}
 			_   => break
 		};
 	}

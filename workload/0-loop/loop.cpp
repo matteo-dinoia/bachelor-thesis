@@ -11,9 +11,9 @@ void handle_signal(int sig) {
 }
 
 // Possible wait to test
-// sudo trace-cmd record -e sched -F ./loop.out
+// sudo trace-cmd record -e sched -F ./loop.out 1000
 
-int main() {
+int main(int argc, char *argv) {
 	struct sigaction sa;
 	struct itimerval timer;
 
@@ -35,9 +35,24 @@ int main() {
 		return 1;
 	}
 
+	// Get timer value
+	if (argc != 2) {
+		printf("Usage: %s <number_millisec>\n", argv[0]);
+		return 1;
+	}
+
+	// Convert the string argument to a number
+	int ms = atoi(argv[1]);
+
+	// Check if conversion was successful
+	if (number <= 0 && argv[1][0] != '0') {
+		printf("Invalid number: %s\n", argv[1]);
+		return 1;
+	}
+
 	// Setting the timer
 	timer.it_value.tv_sec = 0;
-	timer.it_value.tv_usec = 200 * 1000;
+	timer.it_value.tv_usec = number_millisec * 1000;
 	timer.it_interval.tv_sec = 0;
 	timer.it_interval.tv_usec = 0;
 

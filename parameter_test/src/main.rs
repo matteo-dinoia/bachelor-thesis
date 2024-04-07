@@ -119,11 +119,4 @@ fn main() {
 	println!("\nExiting because of command: {}\n", command)
 }
 
-// Look at void print_scx_info(const char *log_lvl, struct task_struct *p);
-// In https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h
 
-/* IN enum scx_ops_flags in https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h#L96
-	 * If set, only tasks with policy set to SCHED_EXT are attached to
-	 * sched_ext. If clear, SCHED_NORMAL tasks are also included.
-*/
-//SCX_OPS_SWITCH_PARTIAL	= 1LLU << 0,

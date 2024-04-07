@@ -8,7 +8,7 @@ include::david-video-presentation.adoc[leveloffset=1]
 include::methods-documentation.adoc[leveloffset=1]
 include::to-save.adoc[leveloffset=1]
 include::historical.adoc[leveloffset=1]
-
+include::practical-notes.adoc[leveloffset=1]
 
 
 == AsciiDoc

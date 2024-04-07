@@ -1,0 +1,18 @@
+= Practical Notes
+
+== Partial vs not
+Sched_ext scheduler in bpf can choose what they manage thanks to the *flag in enum scx_ops_flags* (https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h#L96[Code link]). The flag we care is SCX_OPS_SWITCH_PARTIAL which is set to `1LLU << 3` (may change in the future), this is probably used as a [.underline]#mask# to get a single bit representing the if the option is set or not.
+
+This flag can be changed in the bpf programs with the command `skel->rodata->switch_partial = true;` that does the following:
+
+. If set, *only tasks with policy set to SCHED_EXT* are attached to sched_ext. 
+. If clear, *SCHED_NORMAL tasks are also included*.
+
+This is easily changable in the example scheduler thanks to the *-p* option. This option though is being removed, possibly because it is *not recommended to run in partial* mode on a production system. 
+
+=== Extra info that could be usefull
+. Look at void print_scx_info(const char *log_lvl, struct task_struct *p); at https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h[link]
+. Why is the option -p being removed.
+
+== Changing policy of a programs
+...

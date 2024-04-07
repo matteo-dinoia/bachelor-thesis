@@ -1,5 +1,33 @@
 = Practical Notes
 
+== Scheduling class declaration
+It is declared useing operational structure (?) with link to the callback used plus *name*, *flags* and *timeout_ms*
+[%collapsible]
+====
+```
+SEC(".struct_ops.link")
+struct sched_ext_ops rustland = {
+	.select_cpu		= (void *)rustland_select_cpu,
+	.enqueue		= (void *)rustland_enqueue,
+	.dispatch		= (void *)rustland_dispatch,
+	.running		= (void *)rustland_running,
+	.stopping		= (void *)rustland_stopping,
+	.update_idle		= (void *)rustland_update_idle,
+	.set_cpumask		= (void *)rustland_set_cpumask,
+	.cpu_release		= (void *)rustland_cpu_release,
+	.init_task		= (void *)rustland_init_task,
+	.exit_task		= (void *)rustland_exit_task,
+	.init			= (void *)rustland_init,
+	.exit			= (void *)rustland_exit,
+	.flags			= SCX_OPS_ENQ_LAST | SCX_OPS_KEEP_BUILTIN_IDLE,
+	.timeout_ms		= 5000,
+	.name			= "rustland"
+};
+```
+====
+
+
+
 == Partial vs not
 Sched_ext scheduler in bpf can choose what they manage thanks to the *flag in enum scx_ops_flags* (https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h#L96[Code link]). The flag we care is SCX_OPS_SWITCH_PARTIAL which is set to `1LLU << 3` (may change in the future), this is probably used as a [.underline]#mask# to get a single bit representing the if the option is set or not.
 
@@ -15,4 +43,46 @@ This is easily changable in the example scheduler thanks to the *-p* option. Thi
 . Why is the option -p being removed.
 
 == Changing policy of a programs
-...
+For changing policy of a program it can be used the `get[/set]attr` command, or simply get[/set]sched could be used. They also have respective c binding that are named as `sched_*`. 
+
+That mean it is also possible to do the same on rust, which I did. My program also allow to see a list of program on different scheduler filtering the output of the `ps -Ao` command. It is also possible then to revert all program to SHED_NORMAL.
+
+A list of all the different scheduling class can be seen here:
+```
+SCHED_NORMAL = 0
+SCHED_FIFO = 1
+SCHED_RR = 2
+SCHED_BATCH = 3
+/* "SCHED_ISO": reserved but not implemented yet */
+SCHED_IDLE = 5
+SCHED_DEADLINE = 6
+SCHED_EXT = 7
+```
+
+== Setting time slice (+ mask/cpu) in the scheduler
+In bpf, we can set a time slice *directly while dispatching* the task. This is done with the method `scx_bpf_dispatch(task, dispatch_queue__id, time_slice_ns, enque_flags)`. 
+
+. By default is often SCX_SLICE_DFL = 20 * NSEC_PER_MSEC
+. Can be set to imply *nohz* SCX_SLICE_INF = U64_MAX
+
+//
+
+* This data can be found at https://github.com/sched-ext/sched_ext/blob/35d303a813f8aaea1c6871f4c0b12a0112e0ac2d/include/linux/sched/ext.h#L22[shed/ext.h]
+
+In rustland_core which is a base for some (maybe all) examples scheduler there is a more complex method that invoke the first one, called `dispatch_task(struct task_struct *p, u64 dsq_id, u64 cpumask_cnt, u64 task_slice_ns, u64 enq_flags)` which [.underline]#also have a cpumask#.
+
+In this last method, if the dsq_id is neither SCX_DSQ_LOCAL nor SHARED_DSQ than dispatch a task to a *specific per-CPU* DSQ if the target CPU can be used (according to the cpumask), otherwise redirect the task to the first CPU available, using the shared DSQ logic.
+
+
+=== Notes
+. In dispatch_task (https://github.com/sched-ext/scx/blob/main/rust/scx_rustland_core/assets/bpf/main.bpf.c#L320[Code link]) it use something like `x ?: y` this is a GNU C extension that is equivalent to `x ? x : y`
+. the config used to enable or disable sched_ext is `CONFIG_SCHED_CLASS_EXT`, also extra config can be found at https://github.com/sched-ext/sched_ext/blob/35d303a813f8aaea1c6871f4c0b12a0112e0ac2d/.github/workflows/sched-ext.config[.github/workflows/sched-ext.config],	/* infinite, implies nohz */
+
+== Important components of sched_ext
+After a deeper dive, it seems to me that sched_ext scheduler are composed of different component (and/or abstraction layer). They are, from furthest to closest:
+
+. the *modyfied kernel*, which patch the upstream kernel adding a new scheduling class, sched_ext.
+. *BPF*, *BPF verifier* and i guess (?) *BPF excecuter*
+. *SCX framework* which is mainly composed of [.underline]#scx_rustland_core#, which is a basic implementation on which examples are base on and [.underline]#scx_utils#, which as the name implies contains utils. This can be found at https://github.com/sched-ext/scx/tree/main/rust[scx/rust].
+. the *actual scheduler* which is implemented in a *.bpf.c file or bpf.rs file which than is convert to a main.bpf.c file.
+. the *actual program* which is responsible for [.underline]#loading and removing of the scheduler# from the kernel, making use of the primitive in the SCX_framework. It is also resposible (if required) to [.underline]#log information#, warning, error,... about the scheduler.

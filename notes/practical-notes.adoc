@@ -35,17 +35,17 @@ Sched_ext scheduler in bpf can choose what they manage thanks to the *flag in en
 
 This flag can be changed in the bpf programs with the command `skel->rodata->switch_partial = true;` that does the following:
 
-. If set, *only tasks with policy set to SCHED_EXT* are attached to sched_ext. 
+. If set, *only tasks with policy set to SCHED_EXT* are attached to sched_ext.
 . If clear, *SCHED_NORMAL tasks are also included*.
 
-This is easily changable in the example scheduler thanks to the *-p* option. This option though is being removed, possibly because it is *not recommended to run in partial* mode on a production system. 
+This is easily changable in the example scheduler thanks to the *-p* option. This option though is being removed, possibly because it is *not recommended to run in partial* mode on a production system.
 
 === Extra info that could be usefull
 . Look at void print_scx_info(const char *log_lvl, struct task_struct *p); at https://github.com/sched-ext/sched_ext/blob/sched_ext/include/linux/sched/ext.h[link]
 . Why is the option -p being removed.
 
 == Changing policy of a programs
-For changing policy of a program it can be used the `get[/set]attr` command, or simply get[/set]sched could be used. They also have respective c binding that are named as `sched_*`. 
+For changing policy of a program it can be used the `get[/set]attr` command, or simply get[/set]sched could be used. They also have respective c binding that are named as `sched_*`.
 
 That mean it is also possible to do the same on rust, which I did. My program also allow to see a list of program on different scheduler filtering the output of the `ps -Ao` command. It is also possible then to revert all program to SHED_NORMAL.
 
@@ -62,7 +62,7 @@ SCHED_EXT = 7
 ```
 
 == Setting time slice (+ mask/cpu) in the scheduler
-In bpf, we can set a time slice *directly while dispatching* the task. This is done with the method `scx_bpf_dispatch(task, dispatch_queue__id, time_slice_ns, enque_flags)`. 
+In bpf, we can set a time slice *directly while dispatching* the task. This is done with the method `scx_bpf_dispatch(task, dispatch_queue__id, time_slice_ns, enque_flags)`.
 
 . By default is often SCX_SLICE_DFL = 20 * NSEC_PER_MSEC
 . Can be set to imply *nohz* SCX_SLICE_INF = U64_MAX
@@ -79,6 +79,7 @@ In this last method, if the dsq_id is neither SCX_DSQ_LOCAL nor SHARED_DSQ than 
 === Notes
 . In dispatch_task (https://github.com/sched-ext/scx/blob/main/rust/scx_rustland_core/assets/bpf/main.bpf.c#L320[Code link]) it use something like `x ?: y` this is a GNU C extension that is equivalent to `x ? x : y`
 . the config used to enable or disable sched_ext is `CONFIG_SCHED_CLASS_EXT`, also extra config can be found at https://github.com/sched-ext/sched_ext/blob/35d303a813f8aaea1c6871f4c0b12a0112e0ac2d/.github/workflows/sched-ext.config[.github/workflows/sched-ext.config],	/* infinite, implies nohz */
+. rust-analyzer constantly autobuild
 
 == Important components of sched_ext
 After a deeper dive, it seems to me that sched_ext scheduler are composed of different component (and/or abstraction layer). They are, from furthest to closest:
@@ -87,4 +88,63 @@ After a deeper dive, it seems to me that sched_ext scheduler are composed of dif
 . *BPF*, *BPF verifier* and i guess (?) *BPF excecuter*
 . *SCX framework* which is mainly composed of [.underline]#scx_rustland_core#, which is a basic implementation on which examples are base on and [.underline]#scx_utils#, which as the name implies contains utils. This can be found at https://github.com/sched-ext/scx/tree/main/rust[scx/rust].
 . the *actual scheduler* which is implemented in a *.bpf.c file or bpf.rs file which than is convert to a main.bpf.c file.
+	.. Use a *operational structures* (?) which defines callbacks as pointer to functions and other attributes such as name, timeout and flags (see example above).
 . the *actual program* which is responsible for [.underline]#loading and removing of the scheduler# from the kernel, making use of the primitive in the SCX_framework. It is also resposible (if required) to [.underline]#log information#, warning, error,... about the scheduler.
+
+=== Rustland Builder
+The `build.rs`, which when placed in the root of a package will cause Cargo to compile that script and *execute it just before building* the package.
+``` rust
+fn main() {
+    scx_rustland_core::RustLandBuilder::new()
+        .unwrap()
+        .build()
+        .unwrap();
+}
+```
+Which in turn execute the following code where:
+
+. *expect*: is like unwrap but panic with the specific error message
+. *include_bytes*: is a macro which will yield an expression of type &'static [u8; N] which is the [.underline]#contents of the file#.
+. *enable_intf[/skel]*: (?)
+. *CARGO_MANIFEST_DIR*: The directory containing the manifest of your package, in this case I think it is the manifest of scx_rustland_core, so it is `/rust/scx_rustland_core`
+. *BpfBuilder*: is defined in scx_utils
+
+``` rust
+pub struct RustLandBuilder {
+    inner_builder: BpfBuilder,
+}
+
+impl RustLandBuilder {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            inner_builder: BpfBuilder::new()?,
+        })
+    }
+
+    fn create_file(&self, file_name: &str, content: &[u8]) {
+        let path = Path::new(file_name);
+        let mut file = File::create(&path).expect("Unable to create file");
+        file.write_all(content).expect("Unable to write to file");
+    }
+
+    pub fn build(&mut self) -> Result<()> {
+        // Embed the BPF source files.
+        let intf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/intf.h"));
+        let skel = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/main.bpf.c"));
+        let bpf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf.rs"));
+
+        // Generate BPF backend code (C).
+        self.create_file("intf.h", intf);
+        self.create_file("main.bpf.c", skel);
+
+        self.inner_builder.enable_intf("intf.h", "bpf_intf.rs");
+        self.inner_builder.enable_skel("main.bpf.c", "bpf");
+
+        // Generate user-space BPF connector code (Rust).
+        self.create_file("src/bpf.rs", bpf);
+
+        // Build the scheduler.
+        self.inner_builder.build()
+    }
+}
+```

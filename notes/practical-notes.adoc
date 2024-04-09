@@ -1,10 +1,12 @@
 = Practical Notes
+:source-highlighter: highlightjs
+
 
 == Scheduling class declaration
 It is declared useing operational structure (?) with link to the callback used plus *name*, *flags* and *timeout_ms*
 [%collapsible]
 ====
-```
+``` c
 SEC(".struct_ops.link")
 struct sched_ext_ops rustland = {
 	.select_cpu		= (void *)rustland_select_cpu,
@@ -48,7 +50,7 @@ For changing policy of a program it can be used the `get[/set]attr` command, or 
 That mean it is also possible to do the same on rust, which I did. My program also allow to see a list of program on different scheduler filtering the output of the `ps -Ao` command. It is also possible then to revert all program to SHED_NORMAL.
 
 A list of all the different scheduling class can be seen here:
-```
+``` c
 SCHED_NORMAL = 0
 SCHED_FIFO = 1
 SCHED_RR = 2

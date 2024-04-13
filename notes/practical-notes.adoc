@@ -95,10 +95,10 @@ After a deeper dive, it seems to me that sched_ext scheduler are composed of dif
 The `build.rs`, which when placed in the root of a package will cause Cargo to compile that script and *execute it just before building* the package.
 ``` rust
 fn main() {
-    scx_rustland_core::RustLandBuilder::new()
-        .unwrap()
-        .build()
-        .unwrap();
+	scx_rustland_core::RustLandBuilder::new()
+		.unwrap()
+		.build()
+		.unwrap();
 }
 ```
 Which in turn execute the following code where:
@@ -111,40 +111,67 @@ Which in turn execute the following code where:
 
 ``` rust
 pub struct RustLandBuilder {
-    inner_builder: BpfBuilder,
+	inner_builder: BpfBuilder,
 }
 
 impl RustLandBuilder {
-    pub fn new() -> Result<Self> {
-        Ok(Self {
-            inner_builder: BpfBuilder::new()?,
-        })
-    }
+	pub fn new() -> Result<Self> {
+		Ok(Self {
+			inner_builder: BpfBuilder::new()?,
+		})
+	}
 
-    fn create_file(&self, file_name: &str, content: &[u8]) {
-        let path = Path::new(file_name);
-        let mut file = File::create(&path).expect("Unable to create file");
-        file.write_all(content).expect("Unable to write to file");
-    }
+	fn create_file(&self, file_name: &str, content: &[u8]) {
+		let path = Path::new(file_name);
+		let mut file = File::create(&path).expect("Unable to create file");
+		file.write_all(content).expect("Unable to write to file");
+	}
 
-    pub fn build(&mut self) -> Result<()> {
-        // Embed the BPF source files.
-        let intf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/intf.h"));
-        let skel = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/main.bpf.c"));
-        let bpf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf.rs"));
+	pub fn build(&mut self) -> Result<()> {
+		// Embed the BPF source files.
+		let intf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/intf.h"));
+		let skel = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf/main.bpf.c"));
+		let bpf = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/bpf.rs"));
 
-        // Generate BPF backend code (C).
-        self.create_file("intf.h", intf);
-        self.create_file("main.bpf.c", skel);
+		// Generate BPF backend code (C).
+		self.create_file("intf.h", intf);
+		self.create_file("main.bpf.c", skel);
 
-        self.inner_builder.enable_intf("intf.h", "bpf_intf.rs");
-        self.inner_builder.enable_skel("main.bpf.c", "bpf");
+		self.inner_builder.enable_intf("intf.h", "bpf_intf.rs");
+		self.inner_builder.enable_skel("main.bpf.c", "bpf");
 
-        // Generate user-space BPF connector code (Rust).
-        self.create_file("src/bpf.rs", bpf);
+		// Generate user-space BPF connector code (Rust).
+		self.create_file("src/bpf.rs", bpf);
 
-        // Build the scheduler.
-        self.inner_builder.build()
-    }
+		// Build the scheduler.
+		self.inner_builder.build()
+	}
+}
+```
+
+== Scx Simple statistics
+The global one seem to count dispatched to global queue, while the local one seem to count the time a task was dispatched to local queue:
+``` c
+static void stat_inc(u32 idx)
+{
+	u64 *cnt_p = bpf_map_lookup_elem(&stats, &idx);
+	if (cnt_p)
+		(*cnt_p)++;
+}
+
+s32 BPF_STRUCT_OPS(simple_mine_select_cpu, struct task_struct *p, s32 prev_cpu, u64 wake_flags)
+{
+	/* ... */
+	if (is_idle) { /* if cpu is idle */
+		stat_inc(0);	/* count local queueing */
+		scx_bpf_dispatch(p, SCX_DSQ_LOCAL, SCX_SLICE_DFL, 0);
+	}
+	/* ... */
+}
+
+void BPF_STRUCT_OPS(simple_mine_enqueue, struct task_struct *p, u64 enq_flags)
+{
+	stat_inc(1);	/* count global queueing -> data printed */
+	/* ... */
 }
 ```

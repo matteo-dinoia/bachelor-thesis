@@ -5,15 +5,17 @@
 #include <sys/time.h>
 #include <sched.h>
 
+volatile int test;
+
 void handle_signal(int sig) {
-	if (sig == SIGALRM)
-		exit(0);
+	test=0;
 }
 
 // Possible wait to test
-// sudo trace-cmd record -e sched -F ./loop.out 1000
+// c for children
+// sudo trace-cmd record -e sched -c -F ./loop.out 1000
 
-int main(int argc, char *argv) {
+int main(int argc, char **argv) {
 	struct sigaction sa;
 	struct itimerval timer;
 
@@ -25,6 +27,8 @@ int main(int argc, char *argv) {
 		perror("sched_setscheduler");
 		return 1;
 	}
+
+	test=1;
 
 	// Registering signal handler
 	sa.sa_handler = &handle_signal;
@@ -42,17 +46,19 @@ int main(int argc, char *argv) {
 	}
 
 	// Convert the string argument to a number
-	int ms = atoi(argv[1]);
+	int number_millisec = atoi(argv[1]);
 
 	// Check if conversion was successful
-	if (number <= 0 && argv[1][0] != '0') {
+	if (number_millisec <= 0 && argv[1][0] != '0') {
 		printf("Invalid number: %s\n", argv[1]);
 		return 1;
 	}
 
 	// Setting the timer
-	timer.it_value.tv_sec = 0;
-	timer.it_value.tv_usec = number_millisec * 1000;
+	int number_sec = number_millisec / 1000;
+	number_millisec = number_millisec % 1000;
+	timer.it_value.tv_sec = number_sec;
+	timer.it_value.tv_usec = number_millisec * 1000L;
 	timer.it_interval.tv_sec = 0;
 	timer.it_interval.tv_usec = 0;
 
@@ -63,7 +69,7 @@ int main(int argc, char *argv) {
 
 	// Busy waiting to keep the program alive
 	int counter = 0;
-	while (1)
+	while (test)
 		counter++;
 
 	return 0;

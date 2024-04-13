@@ -1,5 +1,7 @@
 FLAG=-O0
 COMPILE=g++ $(FLAG)
 
-compile:
-	$(COMPILE) loop.cpp -o loop.out 
+all: a.out b.out
+
+%.out:
+	$(COMPILE) loop.cpp -o $@

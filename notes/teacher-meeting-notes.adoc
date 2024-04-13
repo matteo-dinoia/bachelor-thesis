@@ -1,0 +1,29 @@
+= Teacher Meeting Notes
+
+== First notes of meeting
+*Objective short term*: sched_set[/get]attr (+chrt with command line) and install man pages.
+*Longer term objectives*: testing sched_ext with following strategy:
+
+. *cpu affinity mask*: which tell the scheduler where in which core a process can be executed (in simple is a array of bit of length the same as the number of core, where 1 means that it can run on that core and viceversa);
+. *rt-app*: for creating artificial workload based on a config file
+. *trace-cmd and kernelshark*: to save a recording of event (for use are important the sched events) and to visualize them.
+	.. *litrace.h*: provides binding for c. It is a tool of Steven Rostedt (event/fs (?))
+. *using the *get[/set]attr* to change policy of the workload and running only that on sched_ext
+. creating a *table* with on an axis if there is [.underline]#deadline worload and on the other which scheduler is running# CFS (/EEVDF) or sched_ext
+
+== Second Notes of meeting
+*Objective long term*: tracing with trace-cmd the events sched_all (to not lose any) or sched_switch, with no filter or filtering by PID. Than it execute for some interval the scheduler with [.underline]#1ms task timeout and then double# it for the same interval.
+
+We would like to remove everything from some core but for ease peraphs is better to use two different shell, one for login and one for the workload.
+
+*Extra*:
+. analysis of fair scheduling with n task with wi weigth
+. check to see if hyperthreading influence the time they run, running workload as such `[a/\_] [b/_] [c/d]`
+
+
+=== Useful tools
+. *cscope*: for an in deep analysis of c project
+. *pahole _*: gives implementation of given argument (ex. rq (runqueue), task_struct. sched_entity)
+
+=== Notes
+Remember to register to may stage.

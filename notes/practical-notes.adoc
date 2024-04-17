@@ -80,6 +80,7 @@ In this last method, if the dsq_id is neither SCX_DSQ_LOCAL nor SHARED_DSQ than 
 . In dispatch_task (https://github.com/sched-ext/scx/blob/main/rust/scx_rustland_core/assets/bpf/main.bpf.c#L320[Code link]) it use something like `x ?: y` this is a GNU C extension that is equivalent to `x ? x : y`
 . the config used to enable or disable sched_ext is `CONFIG_SCHED_CLASS_EXT`, also extra config can be found at https://github.com/sched-ext/sched_ext/blob/35d303a813f8aaea1c6871f4c0b12a0112e0ac2d/.github/workflows/sched-ext.config[.github/workflows/sched-ext.config],	/* infinite, implies nohz */
 . rust-analyzer constantly autobuild
+. cannot divide in sched_ext
 
 == Important components of sched_ext
 After a deeper dive, it seems to me that sched_ext scheduler are composed of different component (and/or abstraction layer). They are, from furthest to closest:

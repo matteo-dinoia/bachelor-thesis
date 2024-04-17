@@ -27,3 +27,35 @@ We would like to remove everything from some core but for ease peraphs is better
 
 === Notes
 Remember to register to may stage.
+
+== Third Notes of meeting (without Bini)
+*Objecives*:
+
+. [.underline]#affinity mask#: on same cpu using sched_setaffinity;
+	.. if it doesn't work (it does so i can ignore it) i can use cpu_set;
+	.. sched_deadline for example i cannot set affinity but i can use a cpu_set because they are mutually exclusive;
+. [.underline]#1ms then 2ms#: i can use the timer and set internally or do something similar from the ./double.sh and set externally (with sleep)
+. [.underline]#print work done# by both process (to compare)
+
+=== How to do a cpu-set
+[%collapsible]
+===========
+``` bash
+mkdir /dev/cpuset
+mount -t cgroup -o cpuset cpuset /dev/cpuset # mount filesystem cpuset -> must be done every time
+cd /dev/cpuset
+mkdir testingTardiness # new cpuset -> automatically generate files
+echo "5" > testingTardiness/cpuset.cpus # only core 5
+echo "0,1,2,3,4" > cpuset.cpus  # should give error
+echo 0 > testingTardiness/cpuset.mems # make memory exclusive (?)
+echo 1 > cpuset.cpu_exclusive # make set exclusive
+echo 0 > cpuset.sched_load_balance # the rest is for more separation
+echo 1 > testingTardiness/cpuset.cpu_exclusive
+echo 1 > testingTardiness/cpuset.mem_exclusive
+echo $$ > testingTardiness/tasks # this put the actual pid in the cpuset
+
+# is removed with rm -fr /dev/cpuset
+# must be runned as root
+```
+===========
+

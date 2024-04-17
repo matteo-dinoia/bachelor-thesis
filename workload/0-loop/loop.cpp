@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -5,26 +9,35 @@
 #include <sys/time.h>
 #include <sched.h>
 
-volatile int test;
 
-void handle_signal(int sig) {
-	test=0;
-}
+volatile bool running;
 
-int main(int argc, char **argv) {
-	struct sigaction sa;
-	struct itimerval timer;
+void handle_signal(int sig);
 
+
+void setup_shed_param(){
 	// Setting itself in the sched_ext class (0 = itself, 7 = sched_ext)
 	struct sched_param par;
 	sched_getparam(0,  &par);
 	int res = sched_setscheduler(0, 7, &par);
 	if (res != 0) {
 		perror("sched_setscheduler");
-		return 1;
+		exit(1);
 	}
 
-	test=1;
+	// Setting itself on last cpu (15)
+	cpu_set_t mask;
+	CPU_ZERO(&mask);
+	CPU_SET(15, &mask);
+	if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
+		perror("cpuaffinity");
+		exit(1);
+	}
+}
+
+void start_timer(int  number_millisec){
+	struct sigaction sa;
+	struct itimerval timer;
 
 	// Registering signal handler
 	sa.sa_handler = &handle_signal;
@@ -32,25 +45,10 @@ int main(int argc, char **argv) {
 	sa.sa_flags = 0;
 	if (sigaction(SIGALRM, &sa, NULL) == -1) {
 		perror("sigaction");
-		return 1;
+		exit(1);
 	}
 
-	// Get timer value
-	if (argc != 2) {
-		printf("Usage: %s <number_millisec>\n", argv[0]);
-		return 1;
-	}
-
-	// Convert the string argument to a number
-	int number_millisec = atoi(argv[1]);
-
-	// Check if conversion was successful
-	if (number_millisec <= 0 && argv[1][0] != '0') {
-		printf("Invalid number: %s\n", argv[1]);
-		return 1;
-	}
-
-	// Setting the timer
+	// Setup timer
 	int number_sec = number_millisec / 1000;
 	number_millisec = number_millisec % 1000;
 	timer.it_value.tv_sec = number_sec;
@@ -60,13 +58,48 @@ int main(int argc, char **argv) {
 
 	if (setitimer(ITIMER_REAL, &timer, NULL) == -1) {
 		perror("setitimer");
-		return 1;
+		exit(1);
+	}
+}
+
+int get_ms(int argc, char **argv){
+	// Get timer value
+	if (argc != 2) {
+		printf("Usage: %s <number_millisec>\n", argv[0]);
+		return -1;
 	}
 
+	// Convert the string argument to a number
+	int number_millisec = atoi(argv[1]);
+
+	// Check if conversion was successful
+	if (number_millisec <= 0 && argv[1][0] != '0') {
+		printf("Invalid number: %s\n", argv[1]);
+		return -1;
+	}
+
+	return number_millisec;
+}
+
+void handle_signal(int sig) {
+	running = false;
+}
+
+int main(int argc, char **argv) {
+	int ms = get_ms(argc, argv);
+	if(ms == -1)
+		return -1;
+
+	setup_shed_param();
+	start_timer(ms);
+	running = true;
+
 	// Busy waiting to keep the program alive
-	int counter = 0;
-	while (test)
+	long long int counter = 0;
+	while (running)
 		counter++;
+
+	printf("File %s made: %lld\n", argv[0], counter);
 
 	return 0;
 }

@@ -1,0 +1,3 @@
+on trace 4a a.out made: 1747424		b.out made: 1096316361
+on trace 4b a.out made: 538498530	b.out made: 557700013
+on trace 4c a.out made: 405114686	b.out made: 714662777

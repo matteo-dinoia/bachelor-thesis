@@ -11,10 +11,6 @@ void handle_signal(int sig) {
 	test=0;
 }
 
-// Possible wait to test
-// c for children
-// sudo trace-cmd record -e sched -c -F ./loop.out 1000
-
 int main(int argc, char **argv) {
 	struct sigaction sa;
 	struct itimerval timer;

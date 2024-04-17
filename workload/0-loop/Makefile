@@ -3,5 +3,5 @@ COMPILE=g++ $(FLAG)
 
 all: a.out b.out
 
-%.out:
+%.out: loop.cpp Makefile
 	$(COMPILE) loop.cpp -o $@

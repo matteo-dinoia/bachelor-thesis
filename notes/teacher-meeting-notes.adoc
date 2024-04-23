@@ -59,3 +59,12 @@ echo $$ > testingTardiness/tasks # this put the actual pid in the cpuset
 ```
 ===========
 
+== Third Notes of meeting
+It has given me a new pdf with older thesis to use as a starting point.
+*Goals*:
+
+. adding *signal handler* of external signal that make memorize and then print the value before the change of priority;
+. see if it is possible to run the workload as *normal user* (without sudo) using the fact that i can always increace the niceness without sudo.
+. Extra: see if running one of the two task at random give a distribution similar with the law of big number.
+. *read and comment what to keep* and what not to keep of the base pdf
+. add *ebpf and sched_ext* chapters (with ack in ack file and using cite with comma for multimple citations and using entry in .bib).

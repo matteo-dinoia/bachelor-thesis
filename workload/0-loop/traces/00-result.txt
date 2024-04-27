@@ -1,4 +1,12 @@
 on trace 4a a.out made: 1747424		b.out made: 1096316361
 on trace 4b a.out made: 538498530	b.out made: 557700013
 on trace 4c a.out made: 405114686	b.out made: 714662777
-on trace 5  a.out made: 1109324388  b.out made: 1097550915 // same time so about right
+on trace 5a a.out made: 1109324388  b.out made: 1097550915 // same time so about right
+
+on trace 5b
+* File ./b.out made: 1983263175 (988638056 before and 994625119 after)
+* File ./a.out made: 1983335353 (983835373 before and 999499980 after)
+
+on trace 5c
+* File ./a.out made: 1979139784(1004768108 before and 974371676 after)
+* File ./b.out made: 1999550099(973030819 before and 1026519280 after)

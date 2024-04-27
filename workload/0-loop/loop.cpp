@@ -11,6 +11,8 @@
 
 
 volatile bool running;
+volatile long long int first_half_work = -1;
+volatile long long int counter = 0;
 
 void handle_signal(int sig);
 
@@ -43,7 +45,9 @@ void start_timer(int  number_millisec){
 	sa.sa_handler = &handle_signal;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
-	if (sigaction(SIGALRM, &sa, NULL) == -1) {
+	const int res1 = sigaction(SIGALRM, &sa, NULL);
+	const int res2 = sigaction(SIGUSR1, &sa, NULL);
+	if (res1 == -1 || res2 == -1) {
 		perror("sigaction");
 		exit(1);
 	}
@@ -82,7 +86,11 @@ int get_ms(int argc, char **argv){
 }
 
 void handle_signal(int sig) {
-	running = false;
+	if(sig == SIGUSR1){
+		first_half_work = counter;
+	}else if (sig == SIGALRM){
+		running = false;
+	}
 }
 
 int main(int argc, char **argv) {
@@ -95,11 +103,18 @@ int main(int argc, char **argv) {
 	running = true;
 
 	// Busy waiting to keep the program alive
-	long long int counter = 0;
 	while (running)
 		counter++;
 
-	printf("File %s made: %lld\n", argv[0], counter);
+	// Print result
+	printf("File %s made: %lld", argv[0], counter);
+	if(first_half_work != -1){
+		printf(" (%lld before and %lld after)",
+			   first_half_work, (counter - first_half_work));
+	}
+	printf("\n");
+
+
 
 	return 0;
 }

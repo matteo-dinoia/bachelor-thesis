@@ -35,8 +35,12 @@ else
 	sleep $SEC_INBETWEEN
 
 	# change both to high time and priority
-	renice -20 -p $pid1
-	renice -20 -p $pid2
+	# ask to save workload up to first point
+	renice 19 -p $pid1 > /dev/null
+	kill -s SIGUSR1 $pid1
+	renice 19 -p $pid2 > /dev/null
+	kill -s SIGUSR1 $pid2
+	echo "CHANGED PRIORITY of both from 0 to 19"
 fi
 
 wait $pid1 || echo "error on pid1"

@@ -1,0 +1,126 @@
+= David Vernet (Kernel Recipes)
+Kernel Recipes 2023 - sched_ext: pluggable scheduling in the Linux kernel
+
+Summary of video writing mostly only new stuff(https://www.youtube.com/watch?app=desktop&v=8kAcnNVSAdI[Link to Video])
+
+== Introduction
+He call sched_ext a framework. He then talks about the quality of a good scheduler that are:
+
+. *Fairness*
+. *Optimization*: making optimal use of system resources
+. *Low overhead*: Should not take large quantity of time to choose
+. *Generalizable**: should work on any architecture or workload
+
+== CFS
+Is a *fair, weighted, virtual time scheduler*, where [.underline]#threads# are given a proportiola share of gpu based on [.underline]#weight and load#. It is a good base and has worked for long time but it has its own drawbacks, such as:
+
+. was build in a *simpler time*, where topologies were [.underline]#more homogeneous, power consumption were not very important and migrating task had higher cost, s. 
+    .. Now it is more complex with CCD (Core Complex Dies) aggregates groups of CCX (Core Complexs) meaning a cluster of core with shared L3 cache. It can have multiple CCX per numa and/or per CCD #[not sure]#
+. trying to make it work for everything *cannot optimize for single workload*, [.underline]#leaves some performance on the table#
+. *slow to adding new feature* because we cannot regress the scheduler 
+    .. That cause a lot of *out of tree scheduler*
+
+== BPF
+Is a *safe JIT that can run in the kernel*. Historically *was a way to do custom packet filtering* but now it is used in a much wider contest and with a much richer ecosystem.
+
+== SCHED_EXT
+It is *advised to switch all task* to sched_ext because else cfs can always preempt the sched_ext threads, *partial run is supported but not recommended*.
+
+There is *no ABI stability restiction*. It is a purely kernel to kernel interface. #?#
+
+Pro:
+
+. *simple API* and not requires knowing internal
+. *safe* thanks to [.underline]#BPF verifier, watchdog (timeout handler)#,new #sysrq key# for booting sched_ext scheduler through console
+. *useful to test idea* and then implement in CFS
+
+=== Uses (Meta and Google) bespoke (custom) scheduling
+Meta: *HHVM* (some services of meta) optimized 2.5-3% RPS (?) and 3.6-10% improvement for ads ranking
+
+Google: seen strong result on search, VM scheduling with *ghOSt* ([.underline]#similar tool to sched ext, is a userspace scheduling framework and use bpf to accerete some code path, but will rebuild on top of sched_ext#).
+
+== Moving complexity to userspace
+Can offload *difficult task* to userspace, with the ease of BPF to share data between the 2 spaces.
+
+== What is not sched_ext
+. not a *CFS replacement* Because it will always be [.underline]#required a generic scheduler# and it want to be a tool that *can also help CFS*
+    .. *SHARED_RUNQ* (? + link in video) is a direct result of sched_ext experimentations. To be upstreamed (7 months ago)
+. *closed off scheduler* because it requires GPL2
+    .. There are already *out of tree scheduler*, and this may even improve the situation (because of forcing GPL2).
+. will *not impose UAPIs restriction on the kernel* 
+    .. *struct_ops* is main BPF Feature backing sched_ext and *doesn't have uapi guarantees*, because it (the BPF program) is a kernel program
+    .. It can talk using *maps but it not new to BPF* 
+    .. => core scheduling API could change and *could break out of tree scheduler*
+
+== How to build a scheduler
+DSQ, basic building block used to communicate between *BPF scheduler and core (kernel) scheduler*. Conceptually similar to runqueue, when you want to schedules a task to a cpu, you dispatch to a DSQ and then the core kernel consume the task from the DSQ. Special DSQ are local, global. Local DSQ are the per-CPU "runqueue" from which the kernel chooses.
+
+. Scheduler *"dispatches"* task to global queue at enqueue time.
+. Core *"consume"* from global DSQ when the core would otherwise go idle, technical name is *balance*
+
+=== OBS. OF GLOBAL FIFO
+. [.underline]#works conserving#
+. works as *[.underline]#*SHARED_RUNQ patch set* (mentioned before)
+. very simple
+
+=> this is the change that give *extra performance on ads* (works best on single socket)
+
+== Example code
+Can have *flag* like switch_partial that *can be set by userspace* before loading. (add extra info).
+
+Default implementations of ops.select_cpu():
+
+. if the core on which it was running would go idle it reserve again that core
+. if you have SMT find completly idle core (no hyper)
+. else any idle cpu
+
+If the core is idle, it is set to wake up thanks to an IPI (inter processor interrupt).
+
+Can have *per-CCX FIFO using a pseudo-global DSQ* to which i dispatch and from which i consume. Better L3 cache locality, but require balancing (maybe only when there is enought works to do).
+
+== Scheduler created as example in the repo
+Production ready scheduler:
+
+. *scx_rusty* is a rust userspace load balancer, with multicache awerness (L3, CCX) automatically building topology
+. *scx_simple* stupidly easy but usable
+. *scx_flacg* flattened cgroup hierarchy to reduce time to traverse hierarchy 
+
+Not production ready scheduler:
+
+. *scx_qmap* simple five level FIFO queue scheduler, 
+. *scx_central (usefull for gaming)* simple core that schedules for every core, decide when to do a reschedules sending an IPI to kick task
+    .. Useful for workload that *requires few interruption* (ex. VMs, gaming)
+. *scx_pair*: example of stop gap solution for #L1TF# before core scheduling was merged
+
+== Requirements
+Check repo
+
+. *Compile from repo* with .config option
+. clang >= 16 but recommended 17 i remeber
+. pahole >= 1.24
+. rustup nightly (for scx_rusty) [possibly not needed anymore]
+
+== Current status
+=== Upstream fist status of meta
+Need to upstream before using internally. Add work but make it possible to move to latest kernel faster. So they are *trying to upstream sched_ext*, as a priority.
+
+Added in v4 is committed to building ghOSt on top of sched_ext.
+
+=== New features
+Almost features complete but may still want to add:
+
+. *power-aware* for vr and battery
+. *latency nice* (not that much more revelant thanks to EEVDF)
+. extra BPF features (examples polymorfic kfuncs)
+
+== From questions
+. bundled scheduler with an applications
+. doesn't change class (as in name) but migrate anywhere
+. *taint the kernel?* possibly not because it can be something else also can be still something to check in the kernel. Major problem is performance regression.
+    .. Should *not be different from other BPF* tools (ex. #extp#)
+    .. It is [.underline]#up to the distro but should print which scheduler#
+. There are lock for queue but it doesn't seem to cause regredation (with spinlocks).
+
+== Notes
+. Add note to the fact that BPF is often used interchangably with eBPF and as such the same will apply to this thesis.
+. Add some examples plus explanations

@@ -68,3 +68,9 @@ It has given me a new pdf with older thesis to use as a starting point.
 . Extra: see if running one of the two task at random give a distribution similar with the law of big number.
 . *read and comment what to keep* and what not to keep of the base pdf
 . add *ebpf and sched_ext* chapters (with ack in ack file and using cite with comma for multimple citations and using entry in .bib).
+
+== Forth Notes of meeting
+. half or more of the presentation (in ppt) should be an introduction
+. the registration for the thesis is set to open the 20 may
+. maybe add setup sched-ext in the theory part
+. search Tommaso Cuscinotta
